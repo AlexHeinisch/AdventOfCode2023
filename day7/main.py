@@ -20,42 +20,6 @@ card_values_stage1 = {
     'A': 13
 }
 
-def compute_value_stage1(hand: str) -> int:
-    # get how often each card is presented in the hand
-    # dict contains hard and how often it occured
-    # can at maximum contain 5 unique keys
-    occurences = dict()
-    for card in hand:
-        if card not in occurences:
-            occurences[card] = 1
-        else:
-            occurences[card] += 1
-    # build occurence string from dict by taking the values and sorting
-    # use this for general ranking based on patterns
-    # them in descending order e.g. 32 for full-house or 2111 for 1 pair
-    vals = list(occurences.values())
-    vals.sort(reverse=True)
-    occ_str = ''.join([str(i) for i in vals])
-    if occ_str == '5': # five of a kind
-        value = 7_00_00_00_00_00
-    elif occ_str == '41': # four of a kind
-        value = 6_00_00_00_00_00
-    elif occ_str == '32': # full house
-        value = 5_00_00_00_00_00
-    elif occ_str == '311': # three of a kind
-        value = 4_00_00_00_00_00
-    elif occ_str == '221': # two pairs
-        value = 3_00_00_00_00_00
-    elif occ_str == '2111': # one pair
-        value = 2_00_00_00_00_00
-    else: # highest card
-        value = 1_00_00_00_00_00
-    # now add the values of each card in hand by prioritizing
-    # the first card most to apply secondary ranking
-    for i,c in enumerate(hand):
-        value += (10**(8-2*i))*card_values_stage1[c]
-    return value
-
 card_values_stage2 = {
     'J': 0,
     '2': 1,
@@ -72,30 +36,42 @@ card_values_stage2 = {
     'A': 13
 }
 
-def compute_value_stage2(hand) -> int:
+def compute_value(hand: str, stage: int) -> int:
+    card_values = card_values_stage2 if stage == 2 else card_values_stage1
+
+    # get how often each card is presented in the hand
+    # dict contains hard and how often it occured
+    # can at maximum contain 5 unique keys
     occurences = dict()
     for card in hand:
         if card not in occurences:
             occurences[card] = 1
         else:
             occurences[card] += 1
+    
+    num_jokers = 0
+    # === STAGE 2 ONLY ===
     # treat jokers differently
-    if 'J' in occurences:
+    if stage == 2 and 'J' in occurences:
         num_jokers = occurences['J']
         del occurences['J']
-    else:
-        num_jokers = 0
+    # ===
 
-    # compute occurrence string with the rest of the cards just like above
+    # build occurence string from dict by taking the values and sorting
+    # use this for general ranking based on patterns
+    # them in descending order e.g. 32 for full-house or 2111 for 1 pair
+    # stage2: Jokers are ommited
     vals = list(occurences.values())
     vals.sort(reverse=True)
     occ_str = ''.join([str(i) for i in vals])
+
+    # num_jokers only apply to stage 2
 
     if num_jokers == 5 or occ_str == str(5-num_jokers): # five of a kind
         value = 7_00_00_00_00_00
     elif occ_str.startswith(str(4-num_jokers)): # four of a kind
         value = 6_00_00_00_00_00
-    elif occ_str == '32' or (num_jokers == 1 and occ_str == '22'):
+    elif occ_str == '32' or (num_jokers == 1 and occ_str == '22'): # full house
         value = 5_00_00_00_00_00
     elif occ_str.startswith(str(3-num_jokers)): # three of a kind
         value = 4_00_00_00_00_00
@@ -108,19 +84,15 @@ def compute_value_stage2(hand) -> int:
     # now add the values of each card in hand by prioritizing
     # the first card most to apply secondary ranking
     for i,c in enumerate(hand):
-        value += (10**(8-2*i))*card_values_stage2[c]
+        value += (10**(8-2*i))*card_values[c]
     return value
     
 
 def solution(input_string: str, stage: int) -> int:
-    if stage == 1:
-        compute = compute_value_stage1
-    else:
-        compute = compute_value_stage2
     hand_bid_pairs = []
     for line in input_string.split('\n'):
         splt = line.split(' ')
-        hand_bid_pairs.append((splt[0], splt[1], compute(splt[0])))
+        hand_bid_pairs.append((splt[0], splt[1], compute_value(splt[0], stage=stage)))
     hand_bid_pairs.sort(key=lambda x: x[2]) # from weakest to highest by assigned value
     sum = 0
     for i,r in enumerate(hand_bid_pairs):
